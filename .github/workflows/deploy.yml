@@ -23,14 +23,25 @@ jobs:
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
 
-      - name: Sestavení aplikací
+      - name: Build Flatpaks
         run: |
           for manifest in *.yaml; do
-            if [ -f "$manifest" ]; then
-              flatpak-builder --user --install-deps-from=flathub --repo=repo --force-clean build-dir "$manifest"
-            fi
+            [ -f "$manifest" ] || continue
+            flatpak-builder \
+              --user \
+              --install-deps-from=flathub \
+              --repo=repo \
+              --force-clean \
+              build-dir \
+              "$manifest"
           done
-          flatpak build-update-repo --generate-static-deltas --prune --prune-depth=3 --sign ${{ secrets.GPG_KEY_ID }} repo
+
+          flatpak build-update-repo \
+            --generate-static-deltas \
+            --prune \
+            --prune-depth=3 \
+            --gpg-sign="${{ secrets.GPG_KEY_ID }}" \
+            repo
 
       - name: Nahrání do Cloudflare R2
         env:
