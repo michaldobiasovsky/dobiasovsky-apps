@@ -32,10 +32,15 @@ jobs:
               --install-deps-from=flathub \
               --repo=repo \
               --force-clean \
+              --gpg-sign="${{ secrets.GPG_KEY_ID }}" \
               build-dir \
               "$manifest"
           done
 
+          # Vygenerování AppStream metadat (ikona a popis - oprava Segmentation fault v Discoveru)
+          appstream-compose --origin=dobiasovsky-apps --basename=appstream --prefix=/app repo
+
+          # Finální aktualizace repozitáře a podepsání indexu
           flatpak build-update-repo \
             --generate-static-deltas \
             --prune \
