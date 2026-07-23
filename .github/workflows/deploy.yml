@@ -1,0 +1,38 @@
+name: Build and Deploy Flatpak Repo
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Stažení repozitáře
+        uses: actions/checkout@v4
+
+      - name: Instalace Flatpaku a závislostí
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder ostree
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Sestavení aplikací
+        run: |
+          for manifest in *.yaml; do
+            if [ -f "$manifest" ]; then
+              flatpak-builder --user --install-deps-from=flathub --repo=repo --force-clean build-dir "$manifest"
+            fi
+          done
+          flatpak build-update-repo --generate-static-deltas --prune --prune-depth=3 repo
+
+      - name: Nahrání do Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          ENDPOINT_URL: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          aws s3 sync ./repo/ s3://dobiasovsky-apps/ --endpoint-url $ENDPOINT_URL --delete
