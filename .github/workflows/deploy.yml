@@ -16,8 +16,12 @@ jobs:
       - name: Instalace Flatpaku a závislostí
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder ostree
+          sudo apt-get install -y flatpak flatpak-builder ostree gnupg
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Import GPG klíče
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
 
       - name: Sestavení aplikací
         run: |
@@ -26,7 +30,7 @@ jobs:
               flatpak-builder --user --install-deps-from=flathub --repo=repo --force-clean build-dir "$manifest"
             fi
           done
-          flatpak build-update-repo --generate-static-deltas --prune --prune-depth=3 repo
+          flatpak build-update-repo --generate-static-deltas --prune --prune-depth=3 --sign-key=${{ secrets.GPG_KEY_ID }} repo
 
       - name: Nahrání do Cloudflare R2
         env:
