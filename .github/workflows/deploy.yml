@@ -30,7 +30,7 @@ jobs:
               flatpak-builder --user --install-deps-from=flathub --repo=repo --force-clean build-dir "$manifest"
             fi
           done
-          flatpak build-update-repo --generate-static-deltas --prune --prune-depth=3 --sign-key=${{ secrets.GPG_KEY_ID }} repo
+          flatpak build-update-repo --generate-static-deltas --prune --prune-depth=3 --sign ${{ secrets.GPG_KEY_ID }} repo
 
       - name: Nahrání do Cloudflare R2
         env:
