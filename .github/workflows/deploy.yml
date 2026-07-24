@@ -44,6 +44,13 @@ jobs:
             --gpg-sign="${{ secrets.GPG_KEY_ID }}" \
             repo
 
+      # --- NOVÝ KROK: Připravení .flatpakrepo do publikované složky ---
+      - name: Připravení flatpakrepo souboru
+        run: |
+          if [ -f "dobiasovsky-apps.flatpakrepo" ]; then
+            cp dobiasovsky-apps.flatpakrepo ./repo/
+          fi
+
       - name: Nahrání do Cloudflare R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
