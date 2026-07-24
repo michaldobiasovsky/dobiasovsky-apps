@@ -23,8 +23,10 @@ jobs:
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
 
-      - name: Build Flatpaks
+      - name: Build Flatpaks a generování AppStream metadat
         run: |
+          mkdir -p appstream-meta
+
           for manifest in *.yaml; do
             [ -f "$manifest" ] || continue
             flatpak-builder \
@@ -35,8 +37,26 @@ jobs:
               --gpg-sign="${{ secrets.GPG_KEY_ID }}" \
               build-dir \
               "$manifest"
+
+            # Extrakce metainfo souborů pro AppStream katalog
+            if [ -d "build-dir/share/metainfo" ]; then
+              cp -r build-dir/share/metainfo/* appstream-meta/ 2>/dev/null || true
+            fi
+            if [ -d "build-dir/share/appdata" ]; then
+              cp -r build-dir/share/appdata/* appstream-meta/ 2>/dev/null || true
+            fi
           done
 
+          # Vygenerování AppStream katalogu pro Discover a GNOME Software
+          if [ -d "appstream-meta" ] && [ "$(ls -A appstream-meta)" ]; then
+            appstream-compose \
+              --origin=dobiasovsky-apps \
+              --basename=dobiasovsky-apps \
+              --output-dir=./repo/appstream \
+              appstream-meta
+          fi
+
+          # Finální aktualizace repozitáře a jeho indexů
           flatpak build-update-repo \
             --generate-static-deltas \
             --prune \
@@ -44,7 +64,6 @@ jobs:
             --gpg-sign="${{ secrets.GPG_KEY_ID }}" \
             repo
 
-      # --- NOVÝ KROK: Připravení .flatpakrepo do publikované složky ---
       - name: Připravení flatpakrepo souboru
         run: |
           if [ -f "dobiasovsky-apps.flatpakrepo" ]; then
