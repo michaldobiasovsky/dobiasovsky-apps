@@ -20,8 +20,7 @@ jobs:
       - name: Build Flatpaks a generování AppStream metadat
         run: |
           mkdir -p appstream-meta
-          for manifest in *.yaml; do
-            [ -f "$manifest" ] || continue
+          while IFS= read -r -d '' manifest; do
             flatpak-builder \
               --user \
               --install-deps-from=flathub \
@@ -37,7 +36,10 @@ jobs:
             if [ -d "build-dir/share/appdata" ]; then
               cp -r build-dir/share/appdata/* appstream-meta/ 2>/dev/null || true
             fi
-          done
+          done < <(find . -type f -name '*.yaml' \
+            -not -path './.github/*' \
+            -not -path './repo/*' \
+            -not -path './build-dir/*' -print0)
           # Vygenerování AppStream katalogu pro Discover a GNOME Software
           if [ -d "appstream-meta" ] && [ "$(ls -A appstream-meta)" ]; then
             appstream-compose \
@@ -55,14 +57,21 @@ jobs:
             repo
       - name: Připravení flatpakrepo a flatpakref souborů
         run: |
-          if [ -f "dobiasovsky-apps.flatpakrepo" ]; then
-            cp dobiasovsky-apps.flatpakrepo ./repo/
-          fi
-          # Zkopíruje všechny .flatpakref soubory z rootu repozitáře do výsledného repa
-          for ref in *.flatpakref; do
-            [ -f "$ref" ] || continue
+          # Zkopíruje všechny .flatpakrepo soubory z repozitáře do výsledného repa
+          while IFS= read -r -d '' repo_file; do
+            cp "$repo_file" ./repo/
+          done < <(find . -type f -name '*.flatpakrepo' \
+            -not -path './.github/*' \
+            -not -path './repo/*' \
+            -not -path './build-dir/*' -print0)
+
+          # Zkopíruje všechny .flatpakref soubory z repozitáře do výsledného repa
+          while IFS= read -r -d '' ref; do
             cp "$ref" ./repo/
-          done
+          done < <(find . -type f -name '*.flatpakref' \
+            -not -path './.github/*' \
+            -not -path './repo/*' \
+            -not -path './build-dir/*' -print0)
       - name: Nahrání do Cloudflare R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
