@@ -1,32 +1,25 @@
 name: Build and Deploy Flatpak Repo
-
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Stažení repozitáře
         uses: actions/checkout@v4
-
       - name: Instalace Flatpaku a závislostí
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder ostree gnupg appstream-compose
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-
       - name: Import GPG klíče
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import --batch
-
       - name: Build Flatpaks a generování AppStream metadat
         run: |
           mkdir -p appstream-meta
-
           for manifest in *.yaml; do
             [ -f "$manifest" ] || continue
             flatpak-builder \
@@ -37,7 +30,6 @@ jobs:
               --gpg-sign="${{ secrets.GPG_KEY_ID }}" \
               build-dir \
               "$manifest"
-
             # Extrakce metainfo souborů pro AppStream katalog
             if [ -d "build-dir/share/metainfo" ]; then
               cp -r build-dir/share/metainfo/* appstream-meta/ 2>/dev/null || true
@@ -46,7 +38,6 @@ jobs:
               cp -r build-dir/share/appdata/* appstream-meta/ 2>/dev/null || true
             fi
           done
-
           # Vygenerování AppStream katalogu pro Discover a GNOME Software
           if [ -d "appstream-meta" ] && [ "$(ls -A appstream-meta)" ]; then
             appstream-compose \
@@ -55,7 +46,6 @@ jobs:
               --output-dir=./repo/appstream \
               appstream-meta
           fi
-
           # Finální aktualizace repozitáře a jeho indexů
           flatpak build-update-repo \
             --generate-static-deltas \
@@ -63,13 +53,16 @@ jobs:
             --prune-depth=3 \
             --gpg-sign="${{ secrets.GPG_KEY_ID }}" \
             repo
-
-      - name: Připravení flatpakrepo souboru
+      - name: Připravení flatpakrepo a flatpakref souborů
         run: |
           if [ -f "dobiasovsky-apps.flatpakrepo" ]; then
             cp dobiasovsky-apps.flatpakrepo ./repo/
           fi
-
+          # Zkopíruje všechny .flatpakref soubory z rootu repozitáře do výsledného repa
+          for ref in *.flatpakref; do
+            [ -f "$ref" ] || continue
+            cp "$ref" ./repo/
+          done
       - name: Nahrání do Cloudflare R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
